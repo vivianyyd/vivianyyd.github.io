@@ -1,0 +1,16 @@
+body {
+  background-color: #FAFAE5;
+}
+ul {
+  list-style-type: none;
+  padding-left: 10px;
+  line-height: 150%;
+}
+body {
+  font-size: 1.25em;
+  font-family: Arial;
+}
+td {
+  padding: 0 5px;
+  line-height: 135%;
+}

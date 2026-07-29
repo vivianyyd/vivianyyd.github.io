@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>24-hour clock</title>
+  <link rel="icon" type="image/png" href="images/icon.png" />
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #FAFAE5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, Helvetica, Arial, sans-serif;
+    }
+    #clock {
+      width: min(92vw, 92vh);
+      height: auto;
+    }
+    /* Hour number labels */
+    .hour { fill: #5b5b5b; font-size: 15px; text-anchor: middle; dominant-baseline: central; }
+    /* The moving hand */
+    .hand { stroke: #aaaaaa; stroke-width: 2.5; stroke-linecap: round; }
+    /* Hour numbers at the ends of the sunlight block */
+    .hour.bold { fill: #000; font-weight: 700; }
+    /* Optional center readout (delete this block + the <text> below to remove) */
+    .center-time { text-anchor: middle; dominant-baseline: central; }
+    .ct-time { fill: #5b5b5b; font-size: 30px; font-weight: 700; }
+    .ct-date { fill: #5b5b5b; font-size: 20px; }
+  </style>
+</head>
+<body>
+  <svg id="clock" viewBox="-44 -44 488 488" xmlns="http://www.w3.org/2000/svg"></svg>
+
+  <script>
+  // ============================================================
+  //  CONFIG — edit colors / times here
+  // ============================================================
+  // Times are 24h "HH:MM" in EST/EDT. Segments may wrap past midnight
+  // (e.g. sleep "22:30" -> "07:00"). Add/remove rings and segments freely.
+
+  const RINGS = [
+    { // OUTER ring — e.g. daylight vs. night
+      rInner: 158, rOuter: 186,
+      segments: [
+        { start: "06:00", end: "20:00", color: "#ffd257", boldEnds: true }, // daylight
+        { start: "20:00", end: "06:00", color: "#3B2A78" }, // night
+      ]
+    },
+    { // INNER ring — e.g. daily routine
+      rInner: 120, rOuter: 150,
+      segments: [
+        { start: "08:00", end: "18:00", color: "#119787" }, // work
+//         { start: "18:00", end: "20:00", color: "#d4b106" }, // exercise
+        { start: "18:00", end: "23:00", color: "#C21756" }, // free
+        { start: "23:00", end: "07:00", color: "#104585" }, // sleep
+      ]
+    },
+  ];
+
+  const HAND_LENGTH = 186; // how far the hand reaches from center (outer tip)
+  const HAND_INNER = 80;   // where the hand starts (keeps it clear of the center)
+  const LABEL_RADIUS = 200; // radius of the 1..24 hour numbers
+  const TIMEZONE = "America/New_York"; // handles EST/EDT + DST automatically
+
+  // ============================================================
+  //  GEOMETRY  (0/24 at bottom, 12 at top, clockwise)
+  // ============================================================
+  const CX = 200, CY = 200;
+
+  // clockwise angle (deg) from the top (12 o'clock position) for a given hour
+  const hourToAngle = h => (h / 24) * 360 + 180;
+
+  const parseHM = t => { const [h, m] = t.split(":").map(Number); return h + m / 60; };
+
+  // point on the dial at radius r and clockwise-from-top angle a (deg)
+  function pt(r, a) {
+    const rad = a * Math.PI / 180;
+    return { x: CX + r * Math.sin(rad), y: CY - r * Math.cos(rad) };
+  }
+
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (name, attrs) => {
+    const n = document.createElementNS(NS, name);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  };
+
+  // filled annular (ring) sector between two radii, from angle a0 to a1 (a1 > a0)
+  function ringSector(rIn, rOut, a0, a1, color) {
+    const large = (a1 - a0) > 180 ? 1 : 0;
+    const oS = pt(rOut, a0), oE = pt(rOut, a1);
+    const iS = pt(rIn, a0),  iE = pt(rIn, a1);
+    const d = [
+      "M", oS.x, oS.y,
+      "A", rOut, rOut, 0, large, 1, oE.x, oE.y,
+      "L", iE.x, iE.y,
+      "A", rIn, rIn, 0, large, 0, iS.x, iS.y,
+      "Z"
+    ].join(" ");
+    return el("path", { d, fill: color });
+  }
+
+  // ============================================================
+  //  BUILD THE STATIC DIAL
+  // ============================================================
+  const svg = document.getElementById("clock");
+
+  // hours to render bold (the ends of any segment flagged boldEnds)
+  const boldHours = new Set();
+  const roundHour = t => (Math.round(parseHM(t)) % 24) || 24; // 0 -> 24
+
+  // colored ring segments
+  for (const ring of RINGS) {
+    for (const seg of ring.segments) {
+      let a0 = hourToAngle(parseHM(seg.start));
+      let a1 = hourToAngle(parseHM(seg.end));
+      if (a1 <= a0) a1 += 360; // wrap past midnight
+      svg.appendChild(ringSector(ring.rInner, ring.rOuter, a0, a1, seg.color));
+      if (seg.boldEnds) { boldHours.add(roundHour(seg.start)); boldHours.add(roundHour(seg.end)); }
+    }
+  }
+
+  // hour numbers
+  for (let h = 1; h <= 24; h++) {
+    const a = hourToAngle(h);
+    const lp = pt(LABEL_RADIUS, a);
+    const t = el("text", { x: lp.x, y: lp.y, class: boldHours.has(h) ? "hour bold" : "hour" });
+    t.textContent = h;
+    svg.appendChild(t);
+  }
+
+  // optional center digital readout (remove this text el + its update below if unwanted)
+  const readout = el("text", { x: CX, y: CY, class: "center-time" });
+  const readoutTime = el("tspan", { x: CX, dy: "-0.3em", class: "ct-time" });
+  const readoutDate = el("tspan", { x: CX, dy: "1.5em", class: "ct-date" });
+  readout.appendChild(readoutTime);
+  readout.appendChild(readoutDate);
+  svg.appendChild(readout);
+
+  // formatter for the center readout, e.g. "1:00pm" + "Wed Jul 29"
+  const displayFmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: TIMEZONE, hour12: true,
+    weekday: "short", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit"
+  });
+
+  // the moving hand (drawn straight up; rotated to current time)
+  const hand = el("line", { x1: CX, y1: CY - HAND_INNER, x2: CX, y2: CY - HAND_LENGTH, class: "hand" });
+  svg.appendChild(hand);
+
+  // ============================================================
+  //  LIVE UPDATE
+  // ============================================================
+  function nowInTZ() {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: TIMEZONE, hour12: false,
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    }).formatToParts(new Date());
+    const g = t => Number(parts.find(p => p.type === t).value);
+    return { h: g("hour") % 24, m: g("minute"), s: g("second") };
+  }
+
+  function tick() {
+    const { h, m, s } = nowInTZ();
+    const hours = h + m / 60 + s / 3600;
+    hand.setAttribute("transform", `rotate(${hourToAngle(hours)} ${CX} ${CY})`);
+
+    const p = {};
+    for (const part of displayFmt.formatToParts(new Date())) p[part.type] = part.value;
+    readoutTime.textContent = `${p.hour}:${p.minute}${p.dayPeriod.toLowerCase()}`;
+    readoutDate.textContent = `${p.weekday} ${p.month} ${p.day}`;
+  }
+
+  tick();
+  setInterval(tick, 10 * 60 * 1000); // every 10 min — plenty for a 24h dial
+  </script>
+</body>
+</html>

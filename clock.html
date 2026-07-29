@@ -9,7 +9,7 @@
     html, body {
       margin: 0;
       height: 100%;
-      background: #FAFAE5;
+      background: #FFFFFA;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -20,15 +20,15 @@
       height: auto;
     }
     /* Hour number labels */
-    .hour { fill: #5b5b5b; font-size: 15px; text-anchor: middle; dominant-baseline: central; }
+    .hour { fill: #444444; font-size: 20px; text-anchor: middle; dominant-baseline: central; }
     /* The moving hand */
     .hand { stroke: #aaaaaa; stroke-width: 2.5; stroke-linecap: round; }
     /* Hour numbers at the ends of the sunlight block */
     .hour.bold { fill: #000; font-weight: 700; }
     /* Optional center readout (delete this block + the <text> below to remove) */
     .center-time { text-anchor: middle; dominant-baseline: central; }
-    .ct-time { fill: #5b5b5b; font-size: 30px; font-weight: 700; }
-    .ct-date { fill: #5b5b5b; font-size: 20px; }
+    .ct-time { fill: #333333; font-size: 36px; font-weight: 700; }
+    .ct-date { fill: #444444; font-size: 24px; }
   </style>
 </head>
 <body>
@@ -43,14 +43,14 @@
 
   const RINGS = [
     { // OUTER ring — e.g. daylight vs. night
-      rInner: 158, rOuter: 186,
+      rInner: 150, rOuter: 186,
       segments: [
         { start: "06:00", end: "20:00", color: "#ffd257", boldEnds: true }, // daylight
         { start: "20:00", end: "06:00", color: "#3B2A78" }, // night
       ]
     },
     { // INNER ring — e.g. daily routine
-      rInner: 120, rOuter: 150,
+      rInner: 125, rOuter: 145,
       segments: [
         { start: "08:00", end: "18:00", color: "#119787" }, // work
 //         { start: "18:00", end: "20:00", color: "#d4b106" }, // exercise

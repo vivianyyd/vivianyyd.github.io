@@ -8,7 +8,7 @@
   <style>
     html, body {
       margin: 0;
-      height: 100%;
+      min-height: 100%;
       background: #FFFFFA;
       display: flex;
       align-items: center;
@@ -18,6 +18,30 @@
     #clock {
       width: min(92vw, 92vh);
       height: auto;
+    }
+    /* Session-only controls for the inner ring */
+    #controls {
+      position: fixed;
+      bottom: 12px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      font-size: 13px;
+      color: #444;
+    }
+    #controls .row { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+    #controls .swatch {
+      width: 12px; height: 12px; border-radius: 3px; flex: none;
+    }
+    #controls input[type=time] {
+      font: inherit;
+      padding: 1px 3px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #fff;
+      color: inherit;
     }
     /* Hour number labels */
     .hour { fill: #444444; font-size: 20px; text-anchor: middle; dominant-baseline: central; }
@@ -32,6 +56,7 @@
   </style>
 </head>
 <body>
+  <div id="controls"></div>
   <svg id="clock" viewBox="-44 -44 488 488" xmlns="http://www.w3.org/2000/svg"></svg>
 
   <script>
@@ -52,10 +77,10 @@
     { // INNER ring — e.g. daily routine
       rInner: 125, rOuter: 145,
       segments: [
-        { start: "08:00", end: "18:00", color: "#119787" }, // work
+        { start: "08:00", end: "18:00", color: "#119787", label: "work" },
 //         { start: "18:00", end: "20:00", color: "#d4b106" }, // exercise
-        { start: "18:00", end: "23:00", color: "#C21756" }, // free
-        { start: "23:00", end: "07:00", color: "#104585" }, // sleep
+        { start: "18:00", end: "23:00", color: "#C21756", label: "free" },
+        { start: "23:00", end: "07:00", color: "#104585", label: "sleep" },
       ]
     },
   ];
@@ -112,16 +137,29 @@
   const boldHours = new Set();
   const roundHour = t => (Math.round(parseHM(t)) % 24) || 24; // 0 -> 24
 
-  // colored ring segments
+  // colored ring segments (redrawn whenever a control changes)
+  const segLayer = el("g", {});
+  svg.appendChild(segLayer);
+
+  function drawSegments() {
+    segLayer.textContent = "";
+    for (const ring of RINGS) {
+      for (const seg of ring.segments) {
+        let a0 = hourToAngle(parseHM(seg.start));
+        let a1 = hourToAngle(parseHM(seg.end));
+        if (a1 <= a0) a1 += 360; // wrap past midnight
+        segLayer.appendChild(ringSector(ring.rInner, ring.rOuter, a0, a1, seg.color));
+      }
+    }
+  }
+
   for (const ring of RINGS) {
     for (const seg of ring.segments) {
-      let a0 = hourToAngle(parseHM(seg.start));
-      let a1 = hourToAngle(parseHM(seg.end));
-      if (a1 <= a0) a1 += 360; // wrap past midnight
-      svg.appendChild(ringSector(ring.rInner, ring.rOuter, a0, a1, seg.color));
       if (seg.boldEnds) { boldHours.add(roundHour(seg.start)); boldHours.add(roundHour(seg.end)); }
     }
   }
+
+  drawSegments();
 
   // hour numbers
   for (let h = 1; h <= 24; h++) {
@@ -176,6 +214,47 @@
 
   tick();
   setInterval(tick, 60 * 1000); // every 1 min
+
+  // ============================================================
+  //  CONTROLS — edit the labeled segments for this page view only
+  //  (nothing is persisted; a reload restores the CONFIG defaults)
+  // ============================================================
+  const controls = document.getElementById("controls");
+
+  for (const ring of RINGS) {
+    for (const seg of ring.segments) {
+      if (!seg.label) continue;
+      const row = document.createElement("div");
+      row.className = "row";
+
+      const swatch = document.createElement("span");
+      swatch.className = "swatch";
+      swatch.style.background = seg.color;
+
+      const name = document.createElement("label");
+      name.textContent = seg.label;
+
+      const from = document.createElement("input");
+      from.type = "time";
+      from.value = seg.start;
+      from.addEventListener("input", () => {
+        if (from.value) { seg.start = from.value; drawSegments(); }
+      });
+
+      const dash = document.createElement("span");
+      dash.textContent = "–";
+
+      const to = document.createElement("input");
+      to.type = "time";
+      to.value = seg.end;
+      to.addEventListener("input", () => {
+        if (to.value) { seg.end = to.value; drawSegments(); }
+      });
+
+      row.append(swatch, name, from, dash, to);
+      controls.appendChild(row);
+    }
+  }
   </script>
 </body>
 </html>

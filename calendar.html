@@ -6,65 +6,23 @@
 <title>Countdown calendar</title>
 <link rel="icon" type="image/png" href="images/icon.png" />
 <style>
+  html, body { height: 100%; }
   body {
     background: #FFFFFA;
     color: #333333;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 32px 16px;
     margin: 0;
+    overflow: hidden;
+  }
+  #header {
+    position: fixed;
+    top: 0; left: 0;
+    padding: 16px 18px;
+    z-index: 3;
   }
   h1 { font-size: 18px; font-weight: 500; letter-spacing: .04em; margin: 0 0 4px; }
-  .sub { font-size: 13px; opacity: .55; margin-bottom: 20px; }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 3px;
-    width: min(560px, 100%);
-  }
-  .dow {
-    text-align: center;
-    font-size: 11px;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    opacity: .45;
-    padding-bottom: 4px;
-  }
-  .cell {
-    aspect-ratio: 1 / .8;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    font-variant-numeric: tabular-nums;
-    position: relative;
-  }
-  .cell .mlabel {
-    position: absolute;
-    top: 1px;
-    left: 2px;
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: .04em;
-    text-transform: uppercase;
-    opacity: 1;
-  }
-  .cell.blank { background: none; }
-  .cell.first { font-weight: 700; }
-  .legend { display: flex; gap: 14px; margin-top: 22px; font-size: 12px; flex-wrap: wrap; justify-content: center; }
-  .legend div { display: flex; align-items: center; gap: 6px; }
-  .swatch { width: 12px; height: 12px; border-radius: 3px; }
-  .controls {
-    display: flex;
-    gap: 16px;
-    align-items: flex-end;
-    margin-bottom: 18px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
+  .sub { font-size: 13px; opacity: .55; margin-bottom: 12px; }
+  .controls { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
   .controls label {
     display: flex;
     flex-direction: column;
@@ -85,18 +43,117 @@
     border-radius: 5px;
     padding: 5px 8px;
   }
+
+  #stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    padding: 24px;
+    box-sizing: border-box;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(7, var(--cell));
+    gap: var(--gap);
+    flex: none;
+    margin: auto;
+  }
+  .dow {
+    text-align: center;
+    font-size: calc(var(--cell) * .16);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    opacity: .45;
+    padding-bottom: 4px;
+  }
+  .cell {
+    height: calc(var(--cell) * .8);
+    border-radius: calc(var(--cell) * .09);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--cell) * .26);
+    font-variant-numeric: tabular-nums;
+    position: relative;
+  }
+  .cell .mlabel {
+    position: absolute;
+    top: 1px;
+    left: 3px;
+    font-size: calc(var(--cell) * .28);
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .cell.blank { background: none; }
+  .cell.first { font-weight: 700; }
+
+  #key {
+    position: fixed;
+    right: 0; bottom: 0;
+    z-index: 3;
+    padding: 14px 18px;
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  #legend { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  #legend .row { display: flex; align-items: center; gap: 8px; }
+  #legend input[type="color"] {
+    width: 22px; height: 22px; padding: 0;
+    border: 1px solid #d8d8d0; border-radius: 4px;
+    background: none; cursor: pointer;
+  }
+  #legend input[type="text"] {
+    font: inherit; font-size: 12px;
+    width: 78px;
+    color: #333; background: #fff;
+    border: 1px solid #d8d8d0; border-radius: 4px;
+    padding: 3px 5px;
+    font-variant-numeric: tabular-nums;
+  }
+  #legend input[type="text"].bad { border-color: #c96f6f; }
+  #legend .name { min-width: 72px; text-align: right; }
+  .keytools { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+  .keytools button {
+    font: inherit; font-size: 11px;
+    letter-spacing: .06em; text-transform: uppercase;
+    color: #333; background: #fff;
+    border: 1px solid #d8d8d0; border-radius: 5px;
+    padding: 4px 8px; cursor: pointer;
+  }
+  .keytools button:hover { background: #f4f4ee; }
+  .zoomval { font-size: 11px; opacity: .5; font-variant-numeric: tabular-nums; min-width: 38px; text-align: center; }
 </style>
 </head>
 <body>
 
-<h1 id="title">Calendar</h1>
-<div class="sub" id="sub"></div>
-<div class="controls">
-  <label>Start <input type="date" id="startInput"></label>
-  <label>End <input type="date" id="endInput"></label>
+<div id="header">
+  <h1 id="title">Calendar</h1>
+  <div class="sub" id="sub"></div>
+  <div class="controls">
+    <label>Start <input type="date" id="startInput"></label>
+    <label>End <input type="date" id="endInput"></label>
+  </div>
 </div>
-<div class="grid" id="grid"></div>
-<div class="legend" id="legend"></div>
+
+<div id="stage"><div class="grid" id="grid"></div></div>
+
+<div id="key">
+  <div id="legend"></div>
+  <div class="keytools">
+    <button id="zoomOut" title="Zoom out">−</button>
+    <span class="zoomval" id="zoomVal">100%</span>
+    <button id="zoomIn" title="Zoom in">+</button>
+    <button id="zoomFit" title="Fit to screen">Fit</button>
+    <button id="saveFile" title="Download calendar.html with these colors baked in">Save file</button>
+  </div>
+</div>
 
 <script>
 /* ======================= CONFIG — EDIT HERE ======================= */
@@ -110,7 +167,9 @@ const END_DATE   = "2026-11-15";
 const TIMEZONE = "America/New_York";  // EST/EDT
 
 // Color per month (1 = January ... 12 = December).
-// Add/change hex values freely; months not listed fall back to DEFAULT_COLOR.
+// Edit here, or use the pickers in the key — those are remembered in this
+// browser, and "Save file" downloads a copy of this page with them written back
+// into this block (commit it to make them the shared default).
 const MONTH_COLORS = {
   8:  "#4f8ac9",  // August
   9:  "#5cb28f",  // September
@@ -181,6 +240,14 @@ function lighten(hex, amount) {
   return "#" + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
 }
 
+// Accepts "#abc", "abc", "#aabbcc", "aabbcc"; returns "#aabbcc" or null.
+function normalizeHex(s) {
+  const t = (s || "").trim().replace(/^#/, "");
+  if (/^[0-9a-fA-F]{3}$/.test(t)) return "#" + t.split("").map(c => c + c).join("").toLowerCase();
+  if (/^[0-9a-fA-F]{6}$/.test(t)) return "#" + t.toLowerCase();
+  return null;
+}
+
 // Today's civil date in TIMEZONE.
 function todayInTZ() {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -191,12 +258,95 @@ function todayInTZ() {
 
 const startInput = document.getElementById("startInput");
 const endInput   = document.getElementById("endInput");
+const grid       = document.getElementById("grid");
+const stage      = document.getElementById("stage");
 
 // Restore any dates the user picked previously, else fall back to the config.
 startInput.value = localStorage.getItem("cal.start") || START_DATE;
 endInput.value   = localStorage.getItem("cal.end")   || END_DATE;
 
-function render() {
+// Colors: config values, overlaid with anything saved in this browser.
+const colors = Object.assign({}, MONTH_COLORS);
+try {
+  const saved = JSON.parse(localStorage.getItem("cal.colors") || "{}");
+  for (const [m, hex] of Object.entries(saved)) {
+    const h = normalizeHex(hex);
+    if (h) colors[m] = h;
+  }
+} catch (e) { /* ignore a corrupt entry */ }
+
+function colorFor(m) { return colors[m] || DEFAULT_COLOR; }
+
+function saveColors() {
+  localStorage.setItem("cal.colors", JSON.stringify(colors));
+}
+
+// --- zoom -------------------------------------------------------------
+// cellFit is the cell width that makes the whole grid fill the viewport
+// vertically; zoom scales from there.
+let zoom = 1;
+let cellFit = 40;
+const PAD = 24;   // must match #stage's padding in the CSS above
+
+function applyZoom() {
+  const cell = Math.max(8, cellFit * zoom);
+  grid.style.setProperty("--cell", cell + "px");
+  grid.style.setProperty("--gap", Math.max(1, cell * 0.075) + "px");
+  document.getElementById("zoomVal").textContent = Math.round(zoom * 100) + "%";
+}
+
+function fitToScreen(rows) {
+  zoom = 1;
+
+  // Start from an estimate — height = rows*(0.8c + gap) + the weekday header —
+  // then correct against what actually rendered. Line heights, the header's
+  // padding, and subpixel rounding all make the closed form a little off, and
+  // being off by a pixel is the difference between fitting and scrolling.
+  cellFit = Math.max(8, Math.min(
+    (stage.clientHeight - PAD * 2 - 4) / (rows * 0.875 + 0.16),
+    (stage.clientWidth  - PAD * 2) / (7 * 1.075)));
+  applyZoom();
+
+  for (let i = 0; i < 3; i++) {
+    const h = grid.scrollHeight, w = grid.scrollWidth;
+    if (!h || !w) break;
+    // Re-read each pass: an overflowing grid can put a scrollbar on the stage,
+    // which itself shrinks the space available.
+    const availH = stage.clientHeight - PAD * 2;
+    const availW = stage.clientWidth  - PAD * 2;
+    // Leave a hair of slack so a rounded-up scrollHeight can't trip the scrollbar.
+    const scale = Math.min((availH - 1) / h, (availW - 1) / w);
+    if (Math.abs(1 - scale) < 0.002) break;
+    cellFit = Math.max(8, cellFit * scale);
+    applyZoom();
+  }
+}
+
+document.getElementById("zoomIn").onclick  = () => { zoom = Math.min(8, zoom * 1.15); applyZoom(); };
+document.getElementById("zoomOut").onclick = () => { zoom = Math.max(0.2, zoom / 1.15); applyZoom(); };
+document.getElementById("zoomFit").onclick = () => render();
+
+stage.addEventListener("wheel", (e) => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  zoom = Math.min(8, Math.max(0.2, zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1)));
+  applyZoom();
+}, { passive: false });
+
+addEventListener("keydown", (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  if (e.key === "=" || e.key === "+") { e.preventDefault(); zoom = Math.min(8, zoom * 1.15); applyZoom(); }
+  else if (e.key === "-") { e.preventDefault(); zoom = Math.max(0.2, zoom / 1.15); applyZoom(); }
+  else if (e.key === "0") { e.preventDefault(); render(); }
+});
+
+addEventListener("resize", () => render());
+
+// --- render -----------------------------------------------------------
+
+// refit=true recomputes the fit-to-screen size (and drops back to 100%);
+// the periodic refresh passes false so it doesn't undo the user's zoom.
+function render(refit = true) {
   const start = parseISO(startInput.value);
   const end   = parseISO(endInput.value);
   if (!start || !end) return;
@@ -206,14 +356,13 @@ function render() {
   const todayJ = toOrdinal(todayInTZ());
 
   if (endJ < startJ) {
-    document.getElementById("grid").innerHTML = "";
+    grid.innerHTML = "";
     document.getElementById("legend").innerHTML = "";
     document.getElementById("title").textContent = "Calendar";
     document.getElementById("sub").textContent = "End date is before start date.";
     return;
   }
 
-  const grid = document.getElementById("grid");
   grid.innerHTML = "";
 
   for (const name of ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]) {
@@ -223,8 +372,9 @@ function render() {
     grid.appendChild(el);
   }
 
+  const pad = dowMon(startJ);
   // Pad so the first week lines up under the right weekday.
-  for (let i = 0; i < dowMon(startJ); i++) {
+  for (let i = 0; i < pad; i++) {
     const el = document.createElement("div");
     el.className = "cell blank";
     grid.appendChild(el);
@@ -233,12 +383,12 @@ function render() {
   const monthsUsed = [];
   for (let j = startJ; j <= endJ; j++) {
     const { y, m, d } = fromOrdinal(j);
-    const base = MONTH_COLORS[m] || DEFAULT_COLOR;
+    const base = colorFor(m);
     const isPast = j < todayJ;   // a day is "over" once TIMEZONE has moved past it
     const isWeekend = dowMon(j) >= 5;
     const fill = isWeekend ? lighten(base, WEEKEND_LIGHTEN) : base;
 
-    if (!monthsUsed.some(x => x.m === m && x.y === y)) monthsUsed.push({ m, y, base });
+    if (!monthsUsed.some(x => x.m === m && x.y === y)) monthsUsed.push({ m, y });
 
     const el = document.createElement("div");
     el.className = "cell" + (d === 1 || j === startJ ? " first" : "");
@@ -262,31 +412,119 @@ function render() {
   document.getElementById("sub").textContent =
     `${endJ - startJ + 1} days total · ${remaining} remaining`;
 
+  buildLegend(monthsUsed);
+  if (refit) fitToScreen(Math.ceil((pad + (endJ - startJ + 1)) / 7));
+  else applyZoom();
+}
+
+function buildLegend(monthsUsed) {
   const legend = document.getElementById("legend");
   legend.innerHTML = "";
-  for (const { m, base } of monthsUsed) {
-    const wrap = document.createElement("div");
-    const sw = document.createElement("span");
-    sw.className = "swatch";
-    sw.style.background = base;
-    wrap.appendChild(sw);
-    wrap.appendChild(document.createTextNode(MONTH_NAMES[m - 1]));
-    legend.appendChild(wrap);
+  for (const { m } of monthsUsed) {
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = MONTH_NAMES[m - 1];
+
+    const text = document.createElement("input");
+    text.type = "text";
+    text.value = colorFor(m);
+    text.spellcheck = false;
+
+    const picker = document.createElement("input");
+    picker.type = "color";
+    picker.value = colorFor(m);
+
+    const set = (hex) => {
+      colors[m] = hex;
+      saveColors();
+      text.value = hex;
+      picker.value = hex;
+      repaint();
+    };
+    text.addEventListener("input", () => {
+      const hex = normalizeHex(text.value);
+      text.classList.toggle("bad", !hex);
+      if (hex) { colors[m] = hex; saveColors(); picker.value = hex; repaint(); }
+    });
+    text.addEventListener("blur", () => {
+      text.classList.remove("bad");
+      text.value = colorFor(m);
+    });
+    picker.addEventListener("input", () => set(picker.value));
+
+    row.append(name, text, picker);
+    legend.appendChild(row);
   }
 }
 
-startInput.addEventListener("input", () => {
-  localStorage.setItem("cal.start", startInput.value);
-  render();
-});
-endInput.addEventListener("input", () => {
-  localStorage.setItem("cal.end", endInput.value);
-  render();
-});
+// Recolor the existing cells without rebuilding the grid or the legend
+// (so the input you are typing in keeps focus).
+function repaint() {
+  const start = parseISO(startInput.value);
+  const end   = parseISO(endInput.value);
+  if (!start || !end) return;
+  const startJ = toOrdinal(start), endJ = toOrdinal(end);
+  if (endJ < startJ) return;
+  const todayJ = toOrdinal(todayInTZ());
+
+  const cells = grid.querySelectorAll(".cell:not(.blank)");
+  cells.forEach((el, i) => {
+    const j = startJ + i;
+    const { m } = fromOrdinal(j);
+    const base = colorFor(m);
+    const fill = dowMon(j) >= 5 ? lighten(base, WEEKEND_LIGHTEN) : base;
+    el.style.background = j < todayJ ? darken(fill, PAST_DARKEN) : fill;
+  });
+}
+
+// --- persisting colors back into this file ----------------------------
+// The page is static (no server), so it can't overwrite itself on disk. This
+// rewrites the MONTH_COLORS block and hands you the file to save over
+// calendar.html; until then the pickers persist via localStorage.
+document.getElementById("saveFile").onclick = async () => {
+  const body = Object.keys(colors)
+    .map(Number).sort((a, b) => a - b)
+    .map(m => `  ${m}:${m < 10 ? "  " : " "}"${colors[m]}",  // ${MONTH_NAMES[m - 1]}`)
+    .join("\n");
+  const block = `const MONTH_COLORS = {\n${body}\n};`;
+
+  let src;
+  try {
+    src = await (await fetch(location.href, { cache: "no-store" })).text();
+  } catch (e) {
+    // Opened as file:// — the browser gives the page an opaque origin and
+    // refuses to fetch anything, including itself. Hand over the config block
+    // to paste in instead. (Serving the folder over http makes the button work:
+    // python3 -m http.server)
+    try {
+      await navigator.clipboard.writeText(block);
+      alert("Can't read this page's own source when it's opened from disk (file://) — "
+        + "serve the folder over http and this button will write the file for you.\n\n"
+        + "Copied the config to your clipboard; paste it over the MONTH_COLORS block "
+        + "in calendar.html.\n\n" + block);
+    } catch (e2) {
+      prompt("Can't read this page's own source when it's opened from disk (file://). "
+        + "Copy this over the MONTH_COLORS block in calendar.html:", block);
+    }
+    return;
+  }
+  const next = src.replace(/const MONTH_COLORS = \{[\s\S]*?\n\};/, () => block);
+  if (next === src) { alert("Couldn't find the MONTH_COLORS block to update."); return; }
+
+  const url = URL.createObjectURL(new Blob([next], { type: "text/html" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "calendar.html";
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
 render();
 // Re-check around midnight so the page updates itself if left open.
-setInterval(render, 60 * 1000);
+setInterval(() => render(false), 60 * 1000);
 </script>
 </body>
 </html>

@@ -70,17 +70,18 @@
     { // OUTER ring — e.g. daylight vs. night
       rInner: 150, rOuter: 186,
       segments: [
-        { start: "06:00", end: "20:00", color: "#ffd257", boldEnds: true }, // daylight
-        { start: "20:00", end: "06:00", color: "#3B2A78" }, // night
+        { start: "06:30", end: "18:30", color: "#ffd257", boldEnds: true }, // daylight
+        { start: "18:30", end: "06:30", color: "#3B2A78" }, // night
       ]
     },
     { // INNER ring — e.g. daily routine
       rInner: 125, rOuter: 145,
       segments: [
-        { start: "08:00", end: "18:00", color: "#119787", label: "work" },
-//         { start: "18:00", end: "20:00", color: "#d4b106" }, // exercise
-        { start: "18:00", end: "23:00", color: "#C21756", label: "free" },
-        { start: "23:00", end: "07:00", color: "#104585", label: "sleep" },
+        { start: "07:30", end: "17:00", color: "#119787", label: "work" },
+//        { start: "17:00", end: "18:00", color: "#C21756", label: "free1" },
+        { start: "17:00", end: "19:00", color: "#d4b106" }, // exercise
+        { start: "19:00", end: "22:00", color: "#C21756", label: "free" },
+        { start: "21:30", end: "06:30", color: "#104585", label: "sleep" },
       ]
     },
   ];

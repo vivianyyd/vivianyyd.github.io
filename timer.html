@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Timer</title>
+  <link rel="icon" type="image/png" href="images/icon.png" />
+  <style>
+    html { height: 100%; }
+    body { flex-direction: column; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: #DCE6DA; /* pale sage / eucalyptus */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, Helvetica, Arial, sans-serif;
+    }
+    #timer {
+      width: min(92vw, 82vh);
+      height: auto;
+    }
+    /* Controls in the corner, like clock.html */
+    #controls {
+      position: fixed;
+      bottom: 12px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      font-size: 13px;
+      color: #3d4a40;
+    }
+    #controls .row { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+    #controls input, #controls button {
+      font: inherit;
+      padding: 1px 5px;
+      border: 1px solid #c3cfc1;
+      border-radius: 4px;
+      background: #f6f9f5;
+      color: inherit;
+    }
+    #controls input { width: 5.5em; }
+    #controls button { cursor: pointer; }
+    #controls button:hover { background: #fff; }
+    #controls .hint { font-size: 11px; color: #6b786d; }
+    /* Dial */
+    .face { fill: #F4F7F2; }
+    .tick { stroke: #5d6b60; stroke-linecap: round; }
+    .tick.major { stroke-width: 2.5; }
+    .tick.minor { stroke-width: 1; }
+    .num { fill: #3d4a40; font-size: 20px; text-anchor: middle; dominant-baseline: central; }
+    .pie { fill: #119787; } /* same teal as the 'work' block in clock.html */
+    .hub { fill: #e9eee7; stroke: #5d6b60; stroke-width: 1; }
+    #readout { color: #3d4a40; font-size: 22px; min-height: 1.3em; margin-top: 4px; }
+    .done .face { fill: #fbe9e4; }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <div class="row">
+      <label for="duration">set</label>
+      <input id="duration" type="text" placeholder="25" title="e.g. 25, 1:30, 1h30m, 90m, 45s" />
+      <button id="start">start</button>
+      <button id="pause">pause</button>
+      <button id="reset">reset</button>
+    </div>
+    <div class="row">
+      <label for="dial">full circle</label>
+      <input id="dial" type="text" value="60" title="minutes the full circle represents (e.g. 60, 2h, 15)" />
+    </div>
+    <div class="row hint">times: 25 · 1:30 · 1h30m · 90m · 45s (bare number = minutes)</div>
+  </div>
+  <svg id="timer" viewBox="-40 -40 480 480" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div id="readout"></div>
+
+  <script>
+  // ============================================================
+  //  CONFIG
+  // ============================================================
+  const DEFAULT_DIAL_MIN = 60;   // minutes in a full circle
+  const REFRESH_MS = 30 * 1000;  // redraw every 30 s
+
+  const CX = 200, CY = 200;
+  const R_PIE = 170;   // pie radius
+  const R_FACE = 182;  // white face behind the pie
+  const R_TICK = 186;  // ticks start here, outside the face
+  const R_NUM = 212;   // radius of the numbers
+
+  // ============================================================
+  //  HELPERS
+  // ============================================================
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (name, attrs) => {
+    const n = document.createElementNS(NS, name);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  };
+
+  // point at radius r, angle a (deg) measured clockwise from 12 o'clock
+  function pt(r, a) {
+    const rad = a * Math.PI / 180;
+    return { x: CX + r * Math.sin(rad), y: CY - r * Math.cos(rad) };
+  }
+
+  // Parse "25", "1:30", "1:30:00", "1h30m", "90m", "45s", "1.5h" -> seconds (or null)
+  function parseDuration(str) {
+    str = str.trim().toLowerCase();
+    if (!str) return null;
+    if (/^\d+(\.\d+)?$/.test(str)) return Math.round(parseFloat(str) * 60);
+    if (/^\d+(:\d{1,2}){1,2}$/.test(str)) {
+      const p = str.split(":").map(Number);
+      return p.length === 2 ? p[0] * 3600 + p[1] * 60 : p[0] * 3600 + p[1] * 60 + p[2];
+    }
+    const re = /(\d+(?:\.\d+)?)\s*(h|hr|hrs|hours?|m|min|mins|minutes?|s|sec|secs|seconds?)/g;
+    let total = 0, matched = "", m;
+    while ((m = re.exec(str))) {
+      const v = parseFloat(m[1]), u = m[2][0];
+      total += u === "h" ? v * 3600 : u === "m" ? v * 60 : v;
+      matched += m[0];
+    }
+    if (matched.replace(/\s/g, "") !== str.replace(/\s/g, "")) return null;
+    return total > 0 ? Math.round(total) : null;
+  }
+
+  function fmtRemaining(sec) {
+    sec = Math.max(0, Math.ceil(sec));
+    const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+    if (h) return `${h}:${String(m).padStart(2, "0")}`;
+    if (m >= 1) return `${m + (s ? 1 : 0)} min`; // round up, like a kitchen timer
+    return `${s} s`;
+  }
+
+  // ============================================================
+  //  STATE
+  // ============================================================
+  let dialSec = DEFAULT_DIAL_MIN * 60;
+  let setSec = 0;          // the most recently set duration (for reset)
+  let endTime = null;      // ms timestamp when running
+  let pausedRemaining = 0; // seconds left when paused / not started
+
+  const remaining = () =>
+    endTime !== null ? Math.max(0, (endTime - Date.now()) / 1000) : pausedRemaining;
+
+  // ============================================================
+  //  DIAL
+  // ============================================================
+  const svg = document.getElementById("timer");
+  svg.appendChild(el("circle", { cx: CX, cy: CY, r: R_FACE, class: "face" }));
+  const dialLayer = el("g", {});
+  svg.appendChild(dialLayer);
+  const pie = el("path", { class: "pie" });
+  svg.appendChild(pie);
+  svg.appendChild(el("circle", { cx: CX, cy: CY, r: 10, class: "hub" }));
+  const readout = document.getElementById("readout");
+
+  // pick a label step giving roughly 6–12 labels around the circle
+  function labelStep(dialMin) {
+    const steps = [1, 2, 5, 10, 15, 20, 30, 60, 120, 180, 240, 360, 720];
+    return steps.find(s => dialMin / s <= 12) || Math.ceil(dialMin / 12);
+  }
+
+  // Like the physical Time Timer: 0 at the top, numbers increase counterclockwise.
+  function drawDial() {
+    dialLayer.textContent = "";
+    const dialMin = dialSec / 60;
+    const step = labelStep(dialMin);
+    // minor tick spacing: fifths of a label step up to 30 min, quarters above
+    const minor = step > 30 ? step / 4 : step % 5 === 0 ? step / 5 : step;
+    const showHours = dialMin > 120 && step % 60 === 0;
+
+    for (let t = 0; t < dialMin - 1e-9; t += minor) {
+      const a = -360 * t / dialMin;
+      const major = Math.abs(t / step - Math.round(t / step)) < 1e-9;
+      const p0 = pt(R_TICK, a), p1 = pt(R_TICK + (major ? 12 : 6), a);
+      dialLayer.appendChild(el("line", {
+        x1: p0.x, y1: p0.y, x2: p1.x, y2: p1.y, class: major ? "tick major" : "tick minor"
+      }));
+      if (major) {
+        const lp = pt(R_NUM, a);
+        const label = el("text", { x: lp.x, y: lp.y, class: "num" });
+        label.textContent = showHours ? `${t / 60}h` : Math.round(t);
+        dialLayer.appendChild(label);
+      }
+    }
+  }
+
+  // ============================================================
+  //  RENDER
+  // ============================================================
+  function render() {
+    const rem = remaining();
+    const frac = Math.min(1, rem / dialSec);
+
+    if (frac >= 1) {
+      pie.setAttribute("d",
+        `M ${CX} ${CY - R_PIE} A ${R_PIE} ${R_PIE} 0 1 1 ${CX - 0.01} ${CY - R_PIE} Z`);
+    } else if (frac <= 0) {
+      pie.setAttribute("d", "");
+    } else {
+      // sector from 12 o'clock going counterclockwise by frac of the circle
+      const a = -360 * frac;
+      const e = pt(R_PIE, a);
+      const large = frac > 0.5 ? 1 : 0;
+      pie.setAttribute("d",
+        `M ${CX} ${CY} L ${CX} ${CY - R_PIE} A ${R_PIE} ${R_PIE} 0 ${large} 0 ${e.x} ${e.y} Z`);
+    }
+
+    const finished = setSec > 0 && rem <= 0;
+    svg.classList.toggle("done", finished);
+    if (endTime !== null && rem <= 0) endTime = null, pausedRemaining = 0;
+
+    if (setSec === 0) {
+      readout.textContent = "";
+      document.title = "Timer";
+    } else if (finished) {
+      readout.textContent = "done";
+      document.title = "✓ done";
+    } else {
+      const txt = fmtRemaining(rem) + (endTime === null ? " (paused)" : "");
+      readout.textContent = txt;
+      document.title = `${fmtRemaining(rem)} · Timer`;
+    }
+  }
+
+  // ============================================================
+  //  CONTROLS
+  // ============================================================
+  const $ = id => document.getElementById(id);
+  const durationIn = $("duration"), dialIn = $("dial");
+
+  // fresh = true restarts the typed time even if it equals the current one
+  function start(fresh) {
+    const typed = parseDuration(durationIn.value);
+    if (typed !== null && (fresh || typed !== setSec)) {
+      // a new time was typed: start it fresh
+      setSec = typed;
+      pausedRemaining = typed;
+      endTime = null;
+    } else if (typed === null && durationIn.value.trim()) {
+      durationIn.style.borderColor = "#c0392b";
+      return;
+    }
+    if (pausedRemaining <= 0 && setSec > 0 && endTime === null) pausedRemaining = setSec;
+    if (endTime === null && pausedRemaining > 0) endTime = Date.now() + pausedRemaining * 1000;
+    durationIn.style.borderColor = "";
+    render();
+  }
+
+  function pause() {
+    if (endTime === null) return;
+    pausedRemaining = remaining();
+    endTime = null;
+    render();
+  }
+
+  function reset() {
+    endTime = null;
+    pausedRemaining = setSec;
+    render();
+  }
+
+  $("start").addEventListener("click", () => start(false));
+  $("pause").addEventListener("click", pause);
+  $("reset").addEventListener("click", reset);
+  durationIn.addEventListener("keydown", e => {
+    if (e.key === "Enter") start(true);
+  });
+  durationIn.addEventListener("input", () => { durationIn.style.borderColor = ""; });
+
+  function applyDial() {
+    const s = parseDuration(dialIn.value);
+    if (s === null || s < 60) { dialIn.style.borderColor = "#c0392b"; return; }
+    dialIn.style.borderColor = "";
+    dialSec = s;
+    drawDial();
+    render();
+  }
+  dialIn.addEventListener("change", applyDial);
+  dialIn.addEventListener("keydown", e => { if (e.key === "Enter") applyDial(); });
+
+  // ============================================================
+  //  GO
+  // ============================================================
+  drawDial();
+  render();
+  setInterval(render, REFRESH_MS);
+  // also redraw when the tab becomes visible again (background tabs throttle timers)
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
+  </script>
+</body>
+</html>
